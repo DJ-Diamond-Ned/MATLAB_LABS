@@ -1,118 +1,135 @@
-clear; clc; close all;
+clear; clc; close all; % Очистка памяти, консоли и закрытие окон
 
-%  Проверка, является ли функция решением ДУ
-syms y(x) c
-Dy = diff(y, x);
-ode = Dy == (y/x)^2 + 2*y/x;
-y1(x) = c*x^2/(1 - c*x);
-res1 = simplify(subs(ode, y, y1));
-disp('Проверка y = c*x^2/(1-c*x):');
-disp(res1);
-y2(x) = -x;
-res2 = simplify(subs(ode, y, y2));
-disp('Проверка y = -x:');
-disp(res2);
+% =========================================================
+% ЗАДАНИЕ 1: ВЕРИФИКАЦИЯ РЕШЕНИЙ (ПРОВЕРКА ФУНКЦИЙ)
+% =========================================================
+fprintf('=== ЗАДАНИЕ 1: ВЕРИФИКАЦИЯ РЕШЕНИЙ ===\n');
+syms y(x) x % Объявляем символьные переменные y (как функция от x) и x
+derivative_y = diff(y, x); % Описываем операцию взятия производной dy/dx
+% Записываем само уравнение из варианта: y' = (y/x)^2 + 2y/x
+ode_eq = derivative_y == (y/x)^2 + 2*y/x;
 
-%  Решение задачи Коши
-f = @(x,y) 2 - y./x;
-x0 = 1; y0 = 0; x_end = 1.5;
-y_exact = @(x) x - 1./x;
+% --- Проверка функции 1: y = 10x^2 / (1 - 10x) ---
+c_val = 10; % Устанавливаем константу c = 10 из условия
+y1 = (c_val * x^2) / (1 - c_val * x); % Записываем первую проверяемую функцию
+% Подставляем y1 в уравнение и упрощаем. Результат 1 (true) значит решение верно.
+check1 = simplify(subs(ode_eq, y, y1)); 
+fprintf('Результат проверки y = 10x^2/(1-10x): %s\n', char(check1));
 
-% Параметры шагов
-h1 = 0.1; 
-h2 = 0.025;
+% --- Проверка функции 2: y = -x ---
+y2 = -x; % Записываем вторую проверяемую функцию
+% Аналогично подставляем y2 в уравнение и упрощаем.
+check2 = simplify(subs(ode_eq, y, y2)); 
+fprintf('Результат проверки y = -x: %s\n\n', char(check2));
 
-% Метод Эйлера (h=0.1)
-x_euler1 = x0:h1:x_end;
-y_euler1 = zeros(size(x_euler1));
-y_euler1(1) = y0;
-for i = 1:length(x_euler1)-1
-    y_euler1(i+1) = y_euler1(i) + h1 * f(x_euler1(i), y_euler1(i));
+
+% =========================================================
+% ЗАДАНИЕ 2: РЕШЕНИЕ ЗАДАЧИ КОШИ ЧИСЛЕННЫМИ МЕТОДАМИ
+% =========================================================
+% Уравнение варианта: dx/dt = t + e^x
+% t - время (аргумент), x - искомая функция. 
+f = @(t, x) t + exp(x); % Описываем правую часть уравнения f(t,x)
+
+% Граничные условия: x(1) = 0 на отрезке [0, 1]
+t_start = 1; % Начало интегрирования (задано условие x(1))
+t_end = 0;   % Конец интегрирования (идем назад к нулю)
+x_init = 0;  % Значение функции в начальной точке (x=0)
+
+% Шаги интегрирования из задания (h=0.2 и h=0.05)
+h1 = 0.2; 
+h2 = 0.05;
+
+% --- 1. МЕТОД ЭЙЛЕРА ---
+% Расчет для шага h1 = 0.2 (идем от 1 к 0 с шагом -0.2)
+t_e1 = t_start : -h1 : t_end; % Создаем массив точек по времени
+x_e1 = zeros(size(t_e1));     % Создаем пустой массив для значений x
+x_e1(1) = x_init;             % Записываем начальное условие в первый элемент
+for i = 1:length(t_e1)-1      % Цикл прохода по всем точкам
+    % Формула Эйлера: x_следующее = x_текущее + h * f(t, x)
+    x_e1(i+1) = x_e1(i) + (-h1) * f(t_e1(i), x_e1(i)); 
 end
 
-% Метод Эйлера (h=0.025)
-x_euler2 = x0:h2:x_end;
-y_euler2 = zeros(size(x_euler2));
-y_euler2(1) = y0;
-for i = 1:length(x_euler2)-1
-    y_euler2(i+1) = y_euler2(i) + h2 * f(x_euler2(i), y_euler2(i));
+% Расчет для шага h2 = 0.05 (идем от 1 к 0 с шагом -0.05)
+t_e2 = t_start : -h2 : t_end; % Массив точек для мелкого шага
+x_e2 = zeros(size(t_e2));     % Заготовка под значения x
+x_e2(1) = x_init;             % Начальное условие
+for i = 1:length(t_e2)-1      % Цикл по точкам
+    x_e2(i+1) = x_e2(i) + (-h2) * f(t_e2(i), x_e2(i));
 end
 
-% Метод Рунге-Кутты 4 (h=0.1)
-x_rk1 = x0:h1:x_end;
-y_rk1 = zeros(size(x_rk1));
-y_rk1(1) = y0;
-for i = 1:length(x_rk1)-1
-    xi = x_rk1(i);
-    yi = y_rk1(i);
-    k1 = f(xi, yi);
-    k2 = f(xi + h1/2, yi + h1/2*k1);
-    k3 = f(xi + h1/2, yi + h1/2*k2);
-    k4 = f(xi + h1, yi + h1*k3);
-    y_rk1(i+1) = yi + h1/6*(k1 + 2*k2 + 2*k3 + k4);
+% --- 2. МЕТОД РУНГЕ-КУТТЫ 4 ПОРЯДКА (RK4) ---
+% Расчет для шага h1 = 0.2
+t_rk1 = t_start : -h1 : t_end; % Массив времени
+x_rk1 = zeros(size(t_rk1));    % Заготовка под результат
+x_rk1(1) = x_init;             % Начальное условие
+step1 = -h1;                   % Отрицательный шаг для движения назад
+for i = 1:length(t_rk1)-1      % Цикл RK4
+    ti = t_rk1(i); xi = x_rk1(i);
+    k1 = f(ti, xi); % Первая стадия
+    k2 = f(ti + step1/2, xi + step1/2 * k1); % Вторая стадия
+    k3 = f(ti + step1/2, xi + step1/2 * k2); % Третья стадия
+    k4 = f(ti + step1, xi + step1 * k3);     % Четвертая стадия
+    % Итоговое приращение по взвешенной сумме стадий
+    x_rk1(i+1) = xi + (step1/6) * (k1 + 2*k2 + 2*k3 + k4);
 end
 
-% Метод Рунге-Кутты 4 (h=0.025)
-x_rk2 = x0:h2:x_end;
-y_rk2 = zeros(size(x_rk2));
-y_rk2(1) = y0;
-for i = 1:length(x_rk2)-1
-    xi = x_rk2(i);
-    yi = y_rk2(i);
-    k1 = f(xi, yi);
-    k2 = f(xi + h2/2, yi + h2/2*k1);
-    k3 = f(xi + h2/2, yi + h2/2*k2);
-    k4 = f(xi + h2, yi + h2*k3);
-    y_rk2(i+1) = yi + h2/6*(k1 + 2*k2 + 2*k3 + k4);
+% Расчет для шага h2 = 0.05
+t_rk2 = t_start : -h2 : t_end; % Массив времени
+x_rk2 = zeros(size(t_rk2));    % Заготовка под результат
+x_rk2(1) = x_init;             % Начальное условие
+step2 = -h2;                   % Отрицательный шаг
+for i = 1:length(t_rk2)-1      % Цикл RK4
+    ti = t_rk2(i); xi = x_rk2(i);
+    k1 = f(ti, xi);
+    k2 = f(ti + step2/2, xi + step2/2 * k1);
+    k3 = f(ti + step2/2, xi + step2/2 * k2);
+    k4 = f(ti + step2, xi + step2 * k3);
+    x_rk2(i+1) = xi + (step2/6) * (k1 + 2*k2 + 2*k3 + k4);
 end
 
-% Решение стандартными операторами MATLAB
-[x_ode45, y_ode45] = ode45(f, [x0, x_end], y0);
+% --- 3. СТАНДАРТНЫЙ ОПЕРАТОР ODE45 (ЭТАЛОН) ---
+% Решаем встроенным методом Matlab для контроля точности
+[t_ode, x_ode] = ode45(f, [t_start, t_end], x_init);
 
-% Погрешности в конце интервала
-y_exact_end = y_exact(x_end);
-err_euler1_end = abs(y_euler1(end) - y_exact_end);
-err_euler2_end = abs(y_euler2(end) - y_exact_end);
-err_rk1_end = abs(y_rk1(end) - y_exact_end);
-err_rk2_end = abs(y_rk2(end) - y_exact_end);
+% =========================================================
+% ОЦЕНКА ПОГРЕШНОСТЕЙ
+% =========================================================
+x_exact_end = x_ode(end); % Берем значение ode45 в конце пути как "истинное"
 
-% Оценка погрешности по Рунге
-R_euler = abs(y_euler2(end) - y_euler1(end));
-R_rk4 = abs(y_rk2(end) - y_rk1(end)) / (2^4 - 1);
+% Оценка по Рунге (сравнение результатов h1=0.2 и h2=0.05)
+% Коэффициент изменения шага k = h1/h2 = 4
+% Формула погрешности Рунге: R = |x_h2 - x_h1| / (k^p - 1)
+runge_euler = abs(x_e2(end) - x_e1(end)) / (4^1 - 1); % Для Эйлера p=1
+runge_rk4 = abs(x_rk2(end) - x_rk1(end)) / (4^4 - 1);   % Для RK4 p=4
 
-fprintf('Эйлер h=0.1: погрешность в конце = %.6e\n', err_euler1_end);
-fprintf('Эйлер h=0.025: погрешность в конце = %.6e\n', err_euler2_end);
-fprintf('РК4 h=0.1: погрешность в конце = %.6e\n', err_rk1_end);
-fprintf('РК4 h=0.025: погрешность в конце = %.6e\n', err_rk2_end);
-fprintf('Оценка погрешности по Рунге (Эйлер): %.6e\n', R_euler);
-fprintf('Оценка погрешности по Рунге (РК4): %.6e\n', R_rk4);
+fprintf('=== АНАЛИЗ ПОГРЕШНОСТЕЙ (в точке t=0) ===\n');
+fprintf('Погрешность по Рунге (Эйлер): %.6e\n', runge_euler);
+fprintf('Погрешность по Рунге (RK4):   %.6e\n', runge_rk4);
+% Сравниваем наши результаты с эталоном ode45
+fprintf('Разница Эйлер (h=0.05) c ode45: %.6e\n', abs(x_e2(end) - x_exact_end));
+fprintf('Разница RK4 (h=0.05) c ode45:   %.6e\n\n', abs(x_rk2(end) - x_exact_end));
 
-% График всех решений
-figure;
-plot(x_euler1, y_euler1, 'r-o', 'LineWidth', 1, 'MarkerSize', 4); hold on;
-plot(x_euler2, y_euler2, 'r--s', 'LineWidth', 1, 'MarkerSize', 3);
-plot(x_rk1, y_rk1, 'b-^', 'LineWidth', 1, 'MarkerSize', 4);
-plot(x_rk2, y_rk2, 'b--d', 'LineWidth', 1, 'MarkerSize', 3);
-plot(x_ode45, y_ode45, 'k-', 'LineWidth', 2);
-xlabel('x'); ylabel('y');
-title('Решения задачи Коши');
-legend('Эйлер h=0.1','Эйлер h=0.025','РК4 h=0.1','РК4 h=0.025','ode45','Location','best');
+% =========================================================
+% ПОСТРОЕНИЕ ГРАФИКОВ
+% =========================================================
+% Фигура 1: Сравнение всех полученных графиков решений
+figure('Color', 'w', 'Name', 'Решения');
+plot(t_e1, x_e1, 'r-o', 'MarkerSize', 4); hold on; % Эйлер крупный шаг
+plot(t_e2, x_e2, 'r--s', 'MarkerSize', 3);        % Эйлер мелкий шаг
+plot(t_rk1, x_rk1, 'b-^', 'MarkerSize', 4);       % RK4 крупный шаг
+plot(t_rk2, x_rk2, 'b--d', 'MarkerSize', 3);      % RK4 мелкий шаг
+plot(t_ode, x_ode, 'k-', 'LineWidth', 2);         % Эталон ode45
+set(gca, 'XDir','reverse'); % Разворачиваем ось X (т.к. время идет от 1 к 0)
+xlabel('t'); ylabel('x(t)'); title('Решение dx/dt = t + e^x');
+legend('Эйлер h=0.2','Эйлер h=0.05','РК4 h=0.2','РК4 h=0.05','ode45');
 grid on;
-hold off;
 
-% График абсолютной погрешности
-y_exact_euler1 = y_exact(x_euler1);
-y_exact_euler2 = y_exact(x_euler2);
-y_exact_rk1 = y_exact(x_rk1);
-y_exact_rk2 = y_exact(x_rk2);
-
-figure;
-semilogy(x_euler1, abs(y_euler1 - y_exact_euler1), 'r-o', 'LineWidth', 1, 'MarkerSize', 4); hold on;
-semilogy(x_euler2, abs(y_euler2 - y_exact_euler2), 'r--s', 'LineWidth', 1, 'MarkerSize', 3);
-semilogy(x_rk1, abs(y_rk1 - y_exact_rk1), 'b-^', 'LineWidth', 1, 'MarkerSize', 4);
-semilogy(x_rk2, abs(y_rk2 - y_exact_rk2), 'b--d', 'LineWidth', 1, 'MarkerSize', 3);
-xlabel('x'); ylabel('Абсолютная погрешность');
-title('Поведение абсолютной погрешности');
-legend('Эйлер h=0.1','Эйлер h=0.025','РК4 h=0.1','РК4 h=0.025','Location','best');
-grid on;
-hold off;
+% Фигура 2: График роста абсолютной погрешности (логарифмический)
+figure('Color', 'w', 'Name', 'Погрешность');
+% Интерполируем (подгоняем) эталон ode45 под сетку наших расчетов для вычитания
+x_ode_interp = interp1(t_ode, x_ode, t_e2); 
+semilogy(t_e2, abs(x_e2 - x_ode_interp), 'r', 'LineWidth', 1.5); hold on;
+semilogy(t_rk2, abs(x_rk2 - x_ode_interp), 'b', 'LineWidth', 1.5);
+set(gca, 'XDir','reverse'); % Разворачиваем ось X
+xlabel('t'); ylabel('Абсолютная ошибка'); title('Рост погрешности в процессе счета');
+legend('Эйлер (h=0.05)', 'РК4 (h=0.05)'); grid on;
