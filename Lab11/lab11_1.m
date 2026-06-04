@@ -121,3 +121,6 @@ bar(bar_vals, 'FaceColor', [0.6 0.6 0.9]);
 set(gca, 'XTickLabel', {'Зол.сеч.','Параболы','Ньютона','fminbnd','Аналит.'});
 title('Сравнение методов'); ylabel('Оптимальный диаметр, м');
 grid on;
+
+opts = optimset('Display', 'iter');  % Покажет итерации
+[d, fval, exitflag, output] = fminbnd(Q, a, b, opts);

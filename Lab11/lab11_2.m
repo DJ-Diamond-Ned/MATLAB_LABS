@@ -1,90 +1,105 @@
 clear; clc; close all;
+% --- 1. ПАРАМЕТРЫ ЗАДАНИЯ ---
+A = 0.8;            % Константа из условия задачи
+tol = 1e-4;         % Точность поиска (критерий остановки)
+max_iter = 5000;    % Предохранитель, чтобы цикл не стал бесконечным
+alpha = 0.1;        % Начальная "скорость" спуска (шаг)
 
-% Функция: f(x,y) = (x^2 + y - 11)^2 + (x + y^2 - 7)^2
-f = @(x,y) (x.^2 + y - 11).^2 + (x + y.^2 - 7).^2;
+% --- 2. ОПРЕДЕЛЕНИЕ ФУНКЦИИ И ЕЁ ГРАДИЕНТА ---
+% Сама функция f(x, y) с твоей картинки.
+% Для удобства расчетов вынесем часть в скобках в отдельную переменную G.
+G = @(x,y) 2*A + A*cos(1.5*x).*cos(3.14*y) + A*cos(sqrt(5)*x).*cos(3.5*y);
+f = @(x,y) 0.5 * (x.^2 + y.^2) .* G(x,y);
 
-% Градиент
-grad = @(x,y) [4*x*(x^2+y-11) + 2*(x+y^2-7); 2*(x^2+y-11) + 4*y*(x+y^2-7)];
+% Градиент — это вектор производных [df/dx; df/dy].
+% Рассчитан вручную по правилу производной произведения: (u*v)' = u'v + uv'
+% Здесь u = 0.5*(x^2 + y^2), а v = G(x,y)
+dfdx = @(x,y) x.*G(x,y) + 0.5*(x.^2 + y.^2) .* ...
+    (A*(-1.5*sin(1.5*x).*cos(3.14*y)) + A*(-sqrt(5)*sin(sqrt(5)*x).*cos(3.5*y)));
 
-% Параметры
-tol = 1e-4;
-max_iter = 5000;
-alpha = 0.01;
+dfdy = @(x,y) y.*G(x,y) + 0.5*(x.^2 + y.^2) .* ...
+    (A*(-3.14*cos(1.5*x).*sin(3.14*y)) + A*(-3.5*cos(sqrt(5)*x).*sin(3.5*y)));
 
-% Начальная точка
-x = 4; y = 4;
-fprintf('Начальная точка: (%.2f, %.2f), f = %.4f\n', x, y, f(x,y));
+% Объединяем частные производные в один вектор-градиент
+grad = @(x,y) [dfdx(x,y); dfdy(x,y)];
 
-% Градиентный спуск
-x_hist = x; y_hist = y; f_hist = f(x,y);
+% --- 3. ИНИЦИАЛИЗАЦИЯ ---
+% Выбираем начальную точку в диапазоне [-5, 5]
+x_curr = -4; y_curr = 4; 
 
+% Массивы для записи истории спуска (нужны для отрисовки траектории на графике)
+x_hist = x_curr; 
+y_hist = y_curr; 
+f_hist = f(x_curr, y_curr);
+
+% --- 4. ОСНОВНОЙ ЦИКЛ ГРАДИЕНТНОГО СПУСКА ---
 for iter = 1:max_iter
-    g = grad(x, y);
-    if norm(g) < tol, break; end
+    % Считаем градиент в текущей точке
+    g = grad(x_curr, y_curr);
     
-    % Поиск шага
-    alpha_temp = alpha;
+    % Проверка критерия остановки: если длина вектора градиента (наклон) 
+    % стала меньше tol, значит мы на "дне"
+    if norm(g) < tol, break; end 
+    
+    % АДАПТИВНЫЙ ШАГ (Метод дробления/Backtracking)
+    % Чтобы не "перепрыгнуть" минимум из-за большой скорости, 
+    % мы проверяем: станет ли значение функции реально меньше?
+    a_temp = alpha;
     for bt = 1:20
-        x_new = x - alpha_temp * g(1);
-        y_new = y - alpha_temp * g(2);
-        if f(x_new, y_new) < f(x, y)
-            alpha = alpha_temp * 1.05;
-            break;
+        x_try = x_curr - a_temp * g(1);
+        y_try = y_curr - a_temp * g(2);
+        
+        if f(x_try, y_try) < f(x_curr, y_curr)
+            % Если в новой точке значение ниже — подтверждаем этот шаг
+            break; 
         else
-            alpha_temp = alpha_temp * 0.5;
+            % Если "промахнулись" и ушли выше — уменьшаем шаг в 2 раза
+            a_temp = a_temp * 0.5; 
         end
     end
     
-    x = x - alpha * g(1);
-    y = y - alpha * g(2);
+    % Обновляем координаты (двигаемся в сторону, обратную градиенту)
+    x_curr = x_try;
+    y_curr = y_try;
     
-    % Ограничение диапазона [-4.5, 4.5]
-    x = max(-4.5, min(4.5, x));
-    y = max(-4.5, min(4.5, y));
-    
-    x_hist = [x_hist, x];
-    y_hist = [y_hist, y];
-    f_hist = [f_hist, f(x,y)];
+    % Запоминаем новые координаты для графиков
+    x_hist = [x_hist, x_curr];
+    y_hist = [y_hist, y_curr];
+    f_hist = [f_hist, f(x_curr, y_curr)];
 end
 
-% Количество итераций (iter - последний номер итерации в цикле)
-n_iter = length(f_hist) - 1;  % количество выполненных итераций
+% --- 5. ПРОВЕРКА ЭТАЛОННЫМ МЕТОДОМ (Нелдера-Мида) ---
+% Используем встроенную функцию fminsearch для подтверждения результата
+[v_fms, f_fms] = fminsearch(@(v) f(v(1), v(2)), [-4, 4]);
 
-fprintf('\nРезультат:\n');
-fprintf('Оптимум: (%.8f, %.8f)\n', x, y);
-fprintf('Минимум функции: f = %.10f\n', f(x,y));
-fprintf('Итераций: %d\n', n_iter);
-fprintf('Норма градиента: %.2e\n\n', norm(grad(x,y)));
+% --- 6. ВЫВОД РЕЗУЛЬТАТОВ ---
+fprintf('Начальная точка: (-4, 4)\n');
+fprintf('Найденный минимум (x1, x2): (%.6f, %.6f)\n', x_curr, y_curr);
+fprintf('Значение функции в минимуме: %.10f\n', f(x_curr, y_curr));
+fprintf('Затрачено итераций: %d\n', length(f_hist)-1);
+fprintf('Сравнение с fminsearch: %.10f\n', f_fms);
 
-% Проверка встроенными функциями
-f2 = @(v) (v(1)^2 + v(2) - 11)^2 + (v(1) + v(2)^2 - 7)^2;
-opts = optimset('Display', 'off');
-[x_fms, f_fms] = fminsearch(f2, [4,4], opts);
-fprintf('fminsearch: (%.8f, %.8f), f = %.10f\n', x_fms(1), x_fms(2), f_fms);
+% --- 7. ВИЗУАЛИЗАЦИЯ ---
+figure('Position', [100 100 1200 500], 'Color', 'w');
 
-% Графики
-figure('Position', [100 100 1200 500]);
-
-% График 1: Линии уровня и траектория
+% Левый график: Линии уровня и путь нашего спуска
 subplot(1,3,1);
-[X, Y] = meshgrid(linspace(1, 4.5, 100), linspace(1, 4.5, 100));
-contour(X, Y, f(X,Y), 30, 'LineWidth', 0.8); hold on;
-plot(x_hist, y_hist, 'r-o', 'LineWidth', 1.5, 'MarkerSize', 4);
-plot(x_hist(1), y_hist(1), 'go', 'MarkerSize', 10, 'MarkerFaceColor', 'g');
-plot(x, y, 'r*', 'MarkerSize', 15, 'LineWidth', 2);
-xlabel('x'); ylabel('y'); title('Траектория спуска');
-grid on; colorbar;
-
-% График 2: 3D поверхность
-subplot(1,3,2);
-surf(X, Y, f(X,Y), 'EdgeColor', 'none', 'FaceAlpha', 0.7); hold on;
-plot3(x_hist, y_hist, f_hist, 'r-o', 'LineWidth', 1.5, 'MarkerSize', 4);
-plot3(x, y, f(x,y), 'r*', 'MarkerSize', 10);
-xlabel('x'); ylabel('y'); zlabel('f'); title('Поверхность функции');
-view(45, 30); grid on;
-
-% График 3: Сходимость
-subplot(1,3,3);
-semilogy(0:n_iter, f_hist, 'b-o', 'LineWidth', 1.5, 'MarkerSize', 3);
-xlabel('Итерация'); ylabel('f(x,y)'); title('Сходимость метода');
+[XX, YY] = meshgrid(linspace(-5, 5, 100), linspace(-5, 5, 100));
+contour(XX, YY, f(XX,YY), 40); hold on;
+plot(x_hist, y_hist, 'r-o', 'LineWidth', 1.5, 'MarkerSize', 3); % Траектория
+plot(x_curr, y_curr, 'r*', 'MarkerSize', 15); % Итоговая точка
+xlabel('x1'); ylabel('x2'); title('Траектория спуска (вид сверху)');
 grid on;
+
+% Средний график: 3D поверхность функции
+subplot(1,3,2);
+surf(XX, YY, f(XX,YY), 'EdgeColor', 'none', 'FaceAlpha', 0.8); hold on;
+plot3(x_hist, y_hist, f_hist, 'r-o', 'LineWidth', 2); % Спуск на поверхности
+view(35, 45); grid on; colorbar;
+title('3D Поверхность функции');
+
+% Правый график: График сходимости (как быстро падает ошибка)
+subplot(1,3,3);
+semilogy(f_hist, 'LineWidth', 2); % Логарифмический масштаб по Y
+xlabel('Номер итерации'); ylabel('Значение f(x)'); 
+title('Скорость сходимости'); grid on;
